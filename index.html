@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KL Smart Notify</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+
+    background: linear-gradient(-45deg, #ff0000, #6a00ff, #00c6ff, #00ffcc);
+    background-size: 400% 400%;
+    animation: gradientBG 12s ease infinite;
+}
+
+@keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.container {
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(15px);
+    padding: 50px;
+    border-radius: 25px;
+    width: 500px;
+    text-align: center;
+}
+
+/* Title with logo */
+.title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.title img {
+    width: 40px;
+}
+
+h1 {
+    font-size: 26px;
+    margin: 0;
+}
+
+/* Inputs + Button same size */
+input, textarea, button {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    margin-bottom: 15px;
+    box-sizing: border-box; /* 🔥 FIX */
+    font-size: 16px;
+}
+
+/* Input styles */
+input, textarea {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+textarea {
+    height: 100px;
+}
+
+/* Placeholder */
+input::placeholder,
+textarea::placeholder {
+    color: rgba(255,255,255,0.8);
+}
+
+/* Button */
+button {
+    background: linear-gradient(45deg, #ff4d4d, #ff0000);
+    color: white;
+    font-size: 17px;
+    cursor: pointer;
+    margin-top: 5px;
+    transition: 0.3s;
+}
+
+button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px white;
+}
+
+/* File preview */
+.file-preview {
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px;
+    border-radius: 10px;
+    opacity: 0;
+    transform: translateY(50px);
+    transition: 0.4s;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.success { background: green; }
+.error { background: red; }
+.loading { background: orange; }
+
+/* Footer */
+.footer {
+    position: absolute;
+    bottom: 10px;
+    font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- 🔥 Logo + Title -->
+    <div class="title">
+        <img src="kl_logo.png" alt="KL Logo">
+        <h1>KL Smart Notification Hub</h1>
+    </div>
+
+    <input type="email" id="email" placeholder="Enter Email">
+    <input type="text" id="subject" placeholder="Subject">
+    <textarea id="message" placeholder="Enter your message..."></textarea>
+
+    <!-- File Upload -->
+    <input type="file" id="fileInput">
+    <div id="filePreview" class="file-preview"></div>
+
+    <button onclick="sendNotification()">Send Notification</button>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div class="footer">
+    © 2023–2026 KL University
+</div>
+
+<script>
+
+let selectedFile = null;
+
+document.getElementById("fileInput").addEventListener("change", function() {
+    selectedFile = this.files[0];
+
+    if (selectedFile) {
+        document.getElementById("filePreview").innerText =
+            "📂 " + selectedFile.name + " (" + (selectedFile.size/1024).toFixed(2) + " KB)";
+    }
+});
+
+function showToast(msg, type) {
+    const t = document.getElementById("toast");
+    t.innerText = msg;
+    t.className = "toast show " + type;
+
+    setTimeout(() => t.className = "toast", 3000);
+}
+
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+async function sendNotification() {
+
+    const email = document.getElementById("email").value;
+    const subject = document.getElementById("subject").value;
+    const message = document.getElementById("message").value;
+
+    if (!email || !subject || !message) {
+        showToast("⚠ Fill all fields", "error");
+        return;
+    }
+
+    showToast("⏳ Sending...", "loading");
+
+    let fileData = "";
+    let fileName = "";
+
+    if (selectedFile) {
+        const base64 = await toBase64(selectedFile);
+        fileData = base64.split(',')[1];
+        fileName = selectedFile.name;
+    }
+
+    try {
+        const res = await fetch("https://odrcd3vaee.execute-api.us-east-1.amazonaws.com/stage1/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email,
+                subject,
+                message,
+                file: fileData,
+                filename: fileName
+            })
+        });
+
+        if (res.ok) {
+            showToast("✅ Sent with attachment!", "success");
+        } else {
+            showToast("❌ Server error", "error");
+        }
+
+    } catch(e) {
+        showToast("❌ Network error", "error");
+    }
+}
+</script>
+
+</body>
+</html>
